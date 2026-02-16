@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lucky Jet Signals - Прогноз ИИ</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;700;900&display=swap');
+
+        :root {
+            --primary-purple: #9d00ff;
+            --bright-purple: #c342ff;
+            --secondary-purple: #5d0096;
+            --accent-glow: #bd00ff;
+            --bg-dark: #0f0c29;
+            --bg-gradient: radial-gradient(circle at center, #1a1635 0%, #0f0c29 100%);
+            --text-white: #ffffff;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background: var(--bg-dark);
+            background-image: var(--bg-gradient);
+            font-family: 'Roboto', sans-serif;
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-white);
+        }
+
+        /* Контейнер интерфейса */
+        .game-container {
+            position: relative;
+            width: 100%;
+            max-width: 800px;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        /* Заголовок */
+        header {
+            padding: 20px;
+            text-align: center;
+            z-index: 10;
+        }
+
+        h1 {
+            margin: 0;
+            font-size: 24px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            text-shadow: 0 0 15px var(--accent-glow);
+        }
+
+        .status-badge {
+            display: inline-block;
+            margin-top: 5px;
+            padding: 4px 12px;
+            background: rgba(0, 255, 0, 0.1);
+            border: 1px solid #00ff00;
+            border-radius: 12px;
+            font-size: 12px;
+            color: #00ff00;
+            box-shadow: 0 0 10px rgba(0, 255, 0, 0.2);
+        }
+
+        /* Основная область анимации */
+        #gameCanvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+        }
+
+        /* Отображение множителя */
+        .multiplier-display {
+            position: absolute;
+            top: 40%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 6rem;
+            font-weight: 900;
+            /* Ярко-фиолетовый цвет как на скриншоте */
+            color: var(--bright-purple);
+            text-shadow: 0 0 40px rgba(195, 66, 255, 0.8), 0 0 10px rgba(255, 255, 255, 0.3);
+            z-index: 5;
+            transition: all 0.1s ease;
+        }
+        
+        .multiplier-display.final {
+            color: var(--bright-purple);
+            text-shadow: 0 0 60px var(--primary-purple);
+            transform: translate(-50%, -50%) scale(1.15);
+        }
+
+        /* Область управления */
+        .controls {
+            position: absolute;
+            bottom: 40px;
+            left: 0;
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            z-index: 10;
+            padding: 0 20px;
+            box-sizing: border-box;
+        }
+
+        .signal-btn {
+            background: linear-gradient(135deg, #9d00ff 0%, #6a00ff 100%);
+            border: 2px solid rgba(255,255,255,0.2);
+            padding: 20px 0;
+            font-size: 20px;
+            font-weight: 900;
+            color: white;
+            border-radius: 16px;
+            cursor: pointer;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            box-shadow: 0 0 40px rgba(157, 0, 255, 0.6);
+            transition: all 0.2s ease;
+            position: relative;
+            overflow: hidden;
+            width: 100%;
+            max-width: 350px;
+        }
+
+        .signal-btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 0 50px rgba(157, 0, 255, 0.8);
+        }
+
+        .signal-btn:active:not(:disabled) {
+            transform: scale(0.95);
+        }
+
+        .signal-btn:disabled {
+            background: #2a2a2a;
+            box-shadow: none;
+            cursor: not-allowed;
+            color: #666;
+            border-color: #333;
+        }
+
+        .spinner {
+            display: none;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255,255,255,0.3);
+            border-radius: 50%;
+            border-top-color: #fff;
+            animation: spin 0.8s linear infinite;
+            margin-right: 12px;
+            display: inline-block;
+            vertical-align: middle;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        @media (max-width: 600px) {
+            .multiplier-display {
+                font-size: 4.5rem;
+            }
+            .signal-btn {
+                font-size: 18px;
+                max-width: 90%;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="game-container">
+        <header>
+            <h1>LUCKY JET <span style="color: #bd00ff;">СИГНАЛ</span></h1>
+            <div class="status-badge">● СЕРВЕР АКТИВЕН</div>
+        </header>
+
+        <canvas id="gameCanvas"></canvas>
+
+        <div id="counter" class="multiplier-display">x1.00</div>
+
+        <div class="controls">
+            <button id="getSignalBtn" class="signal-btn">
+                <span id="btnSpinner" class="spinner" style="display: none;"></span>
+                <span id="btnText">ПОЛУЧИТЬ СИГНАЛ</span>
+            </button>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const counterEl = document.getElementById('counter');
+        const btn = document.getElementById('getSignalBtn');
+        const btnText = document.getElementById('btnText');
+        const btnSpinner = document.getElementById('btnSpinner');
+
+        let width, height;
+        let stars = [];
+        let particles = [];
+        let isFlying = false;
+        
+        let currentMultiplier = 1.00;
+        let targetMultiplier = 1.00;
+        let flightStartTime = 0;
+
+        function resize() {
+            width = canvas.width = window.innerWidth;
+            height = canvas.height = window.innerHeight;
+            initStars();
+        }
+        window.addEventListener('resize', resize);
+
+        function initStars() {
+            stars = [];
+            for (let i = 0; i < 100; i++) {
+                stars.push({
+                    x: Math.random() * width,
+                    y: Math.random() * height,
+                    size: Math.random() * 2,
+                    alpha: Math.random(),
+                    speed: 0.005 + Math.random() * 0.02
+                });
+            }
+        }
+
+        function drawBackground() {
+            ctx.clearRect(0, 0, width, height);
+            
+            // Сетка
+            ctx.strokeStyle = "rgba(157, 0, 255, 0.08)";
+            ctx.lineWidth = 1;
+            const step = 80;
+            for (let x = 0; x < width; x += step) {
+                ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, height); ctx.stroke();
+            }
+            for (let y = 0; y < height; y += step) {
+                ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(width, y); ctx.stroke();
+            }
+
+            // Звезды
+            ctx.fillStyle = "#ffffff";
+            stars.forEach(s => {
+                s.alpha += s.speed;
+                if (s.alpha > 1 || s.alpha < 0) s.speed *= -1;
+                ctx.globalAlpha = Math.max(0, s.alpha);
+                ctx.beginPath();
+                ctx.arc(s.x, s.y, s.size, 0, Math.PI * 2);
+                ctx.fill();
+            });
+            ctx.globalAlpha = 1.0;
+        }
+
+        // --- Персонаж (Счастливчик Джо из Скриншота) ---
+        function drawLuckyJoe(x, y, angle) {
+            ctx.save();
+            ctx.translate(x, y);
+            ctx.rotate(angle);
+            const s = 1.4; // Масштаб
+            ctx.scale(s, s);
+
+            // Реактивный след (Огонь)
+            if (isFlying) {
+                const fSize = 20 + Math.random() * 15;
+                const grad = ctx.createRadialGradient(-20, 10, 0, -20, 10, fSize);
+                grad.addColorStop(0, "rgba(255, 255, 255, 1)");
+                grad.addColorStop(0.3, "rgba(255, 200, 0, 0.8)");
+                grad.addColorStop(1, "rgba(255, 50, 0, 0)");
+                ctx.fillStyle = grad;
+                ctx.beginPath();
+                ctx.moveTo(-15, 5);
+                ctx.lineTo(-15 - fSize * 1.5, 10);
+                ctx.lineTo(-15, 15);
+                ctx.fill();
+            }
+
+            // 1. Ранец (Серый металлик)
+            ctx.fillStyle = "#555";
+            ctx.beginPath();
+            ctx.roundRect(-22, -5, 12, 30, 4);
+            ctx.fill();
+            
+            // 2. Тело (Желтая куртка)
+            ctx.fillStyle = "#facc15"; // Желтый
+            ctx.beginPath();
+            ctx.ellipse(0, 8, 12, 16, 0, 0, Math.PI * 2);
+            ctx.fill();
+            // Детали куртки (линии)
+            ctx.strokeStyle = "#a16207";
+            ctx.lineWidth = 1;
+            ctx.beginPath(); ctx.moveTo(-6, 0); ctx.lineTo(-6, 18); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(6, 0); ctx.lineTo(6, 18); ctx.stroke();
+
+            // 3. Голова
+            ctx.fillStyle = "#ffdbac"; // Кожа
+            ctx.beginPath();
+            ctx.arc(0, -12, 12, 0, Math.PI * 2);
+            ctx.fill();
+
+            // 4. Волосы (Коричневые, объемные)
+            ctx.fillStyle = "#451a03";
+            ctx.beginPath();
+            ctx.moveTo(-12, -15);
+            ctx.quadraticCurveTo(-5, -30, 8, -25);
+            ctx.quadraticCurveTo(15, -20, 12, -10);
+            ctx.lineTo(-12, -10);
+            ctx.fill();
+
+            // 5. Очки (Черные)
+            ctx.fillStyle = "#000";
+            ctx.beginPath();
+            ctx.moveTo(-11, -15);
+            ctx.lineTo(11, -15);
+            ctx.lineTo(11, -8);
+            ctx.lineTo(-11, -8);
+            ctx.closePath();
+            ctx.fill();
+
+            // 6. Маска (Черная/Темно-серая)
+            ctx.fillStyle = "#1a1a1a";
+            ctx.beginPath();
+            ctx.moveTo(-11, -6);
+            ctx.quadraticCurveTo(0, -2, 11, -6);
+            ctx.lineTo(8, 4);
+            ctx.quadraticCurveTo(0, 8, -8, 4);
+            ctx.fill();
+            // Фильтры на маске
+            ctx.fillStyle = "#444";
+            ctx.beginPath(); ctx.arc(-5, 1, 3, 0, Math.PI * 2); ctx.fill();
+            ctx.beginPath(); ctx.arc(5, 1, 3, 0, Math.PI * 2); ctx.fill();
+
+            // 7. Ноги (Желтые штаны + белые кроссовки)
+            ctx.fillStyle = "#facc15";
+            ctx.fillRect(-8, 20, 6, 8); // левая
+            ctx.fillRect(2, 20, 6, 8);  // правая
+            ctx.fillStyle = "#fff"; // Кроссовки
+            ctx.beginPath(); ctx.roundRect(-9, 28, 8, 5, 2); ctx.fill();
+            ctx.beginPath(); ctx.roundRect(1, 28, 8, 5, 2); ctx.fill();
+
+            ctx.restore();
+        }
+
+        class TrailParticle {
+            constructor(x, y) {
+                this.x = x; this.y = y;
+                this.size = Math.random() * 4 + 2;
+                this.life = 1.0;
+                this.vx = -3 - Math.random() * 3;
+                this.vy = (Math.random() - 0.5) * 2;
+            }
+            update() {
+                this.x += this.vx; this.y += this.vy;
+                this.life -= 0.03;
+            }
+            draw() {
+                ctx.fillStyle = `rgba(189, 0, 255, ${this.life})`;
+                ctx.beginPath(); ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2); ctx.fill();
+            }
+        }
+
+        function animate() {
+            drawBackground();
+
+            let posX = 60;
+            let posY = height - 120;
+            let angle = 0;
+
+            if (isFlying || currentMultiplier > 1.0) {
+                const elapsed = Date.now() - flightStartTime;
+                const t = Math.min(elapsed / 2500, 1);
+                
+                // Траектория: Снизу вверх и вправо (как на скрине)
+                const easeX = 1 - Math.pow(1 - t, 2);
+                const easeY = 1 - Math.pow(1 - t, 4);
+
+                posX = 60 + (width * 0.65) * easeX;
+                posY = (height - 120) - (height * 0.7) * easeY;
+                
+                // Наклон вверх
+                angle = -0.35 * (1 - easeY);
+
+                if (isFlying) {
+                    particles.push(new TrailParticle(posX - 30, posY + 15));
+                }
+            }
+
+            // Рисуем фиолетовую кривую взлета
+            ctx.beginPath();
+            ctx.moveTo(60, height - 120);
+            const cpX = 60 + (posX - 60) * 0.5;
+            ctx.quadraticCurveTo(cpX, height - 120, posX, posY);
+            ctx.strokeStyle = "#bd00ff";
+            ctx.lineWidth = 6;
+            ctx.shadowColor = "#bd00ff";
+            ctx.shadowBlur = 20;
+            ctx.stroke();
+            ctx.shadowBlur = 0;
+
+            // Заполнение под кривой
+            ctx.lineTo(posX, height);
+            ctx.lineTo(60, height);
+            const fillGrad = ctx.createLinearGradient(0, posY, 0, height);
+            fillGrad.addColorStop(0, "rgba(189, 0, 255, 0.4)");
+            fillGrad.addColorStop(1, "rgba(189, 0, 255, 0)");
+            ctx.fillStyle = fillGrad;
+            ctx.fill();
+
+            // Частицы шлейфа
+            particles = particles.filter(p => {
+                p.update(); p.draw(); return p.life > 0;
+            });
+
+            drawLuckyJoe(posX, posY, angle);
+
+            if (isFlying) {
+                if (currentMultiplier < targetMultiplier) {
+                    // Скорость набора цифр
+                    currentMultiplier += 0.01 + (currentMultiplier * 0.007);
+                    if (currentMultiplier >= targetMultiplier) {
+                        currentMultiplier = targetMultiplier;
+                        isFlying = false;
+                        finishSignal();
+                    }
+                }
+            }
+
+            counterEl.innerText = 'x' + currentMultiplier.toFixed(2);
+            requestAnimationFrame(animate);
+        }
+
+        function finishSignal() {
+            counterEl.classList.add('final');
+            btn.disabled = false;
+            btnText.innerText = "ПОЛУЧИТЬ СИГНАЛ";
+            btnSpinner.style.display = "none";
+        }
+
+        btn.addEventListener('click', () => {
+            if (isFlying) return;
+
+            btn.disabled = true;
+            btnText.innerText = "АНАЛИЗ...";
+            btnSpinner.style.display = "inline-block";
+            counterEl.classList.remove('final');
+
+            // Генерация числа
+            const r = Math.random();
+            if (r < 0.6) targetMultiplier = 1.1 + Math.random() * 4;
+            else if (r < 0.9) targetMultiplier = 5 + Math.random() * 15;
+            else targetMultiplier = 20 + Math.random() * 300;
+
+            setTimeout(() => {
+                btnText.innerText = "В ПОЛЕТЕ";
+                currentMultiplier = 1.00;
+                isFlying = true;
+                flightStartTime = Date.now();
+                particles = [];
+            }, 1200);
+        });
+
+        resize();
+        animate();
+    </script>
+</body>
+</html>
